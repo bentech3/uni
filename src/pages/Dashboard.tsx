@@ -1,23 +1,43 @@
-import { useState } from 'react';
+// src/pages/Dashboard.tsx
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockNotices, departments, offices } from '@/lib/mockData';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus, Edit, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { NoticeCard } from '@/components/NoticeCard';
+import { supabase } from '@/integrations/supabase/client';
+import type { Notice } from '@/types/notice';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState('notices');
+  const [userNotices, setUserNotices] = useState<Notice[]>([]);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -26,43 +46,117 @@ const Dashboard = () => {
   const [office, setOffice] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
 
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [offices, setOffices] = useState<string[]>([]);
+
   if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
     return <Navigate to="/auth" />;
   }
 
-  const userNotices = mockNotices.filter(n => n.authorId === user.id);
+  // Fetch user notices
+  useEffect(() => {
+    const loadNotices = async () => {
+      const { data, error } = await supabase
+        .from('notices')
+        .select('*')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false });
 
-  const handleCreateNotice = (e: React.FormEvent) => {
+      if (error) {
+        toast.error('Failed to load notices');
+        console.error(error);
+        return;
+      }
+
+      setUserNotices(data as Notice[]);
+    };
+
+    loadNotices();
+  }, [user.id]);
+
+  // Fetch departments and offices
+  useEffect(() => {
+    const loadMeta = async () => {
+      const { data: deptData, error: deptError } = await supabase
+        .from('departments')
+        .select('name')
+        .order('name');
+
+      if (deptError) {
+        console.error(deptError);
+      } else {
+        setDepartments(['All Departments', ...deptData.map((d) => d.name)]);
+      }
+
+      const { data: officeData, error: officeError } = await supabase
+        .from('offices')
+        .select('name')
+        .order('name');
+
+      if (officeError) {
+        console.error(officeError);
+      } else {
+        setOffices(['All Offices', ...officeData.map((o) => o.name)]);
+      }
+    };
+
+    loadMeta();
+  }, []);
+
+  // Handle creating a new notice
+  const handleCreateNotice = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Notice created! (Backend required for persistence)');
+
+    const { data, error } = await supabase
+      .from('notices')
+      .insert([
+        {
+          title,
+          content,
+          department_id: department === 'All Departments' ? null : department,
+          office_id: office === 'All Offices' ? null : office,
+          expire_at: expiryDate || null,
+          author_id: user.id,
+          is_active: true,
+        },
+      ])
+      .select();
+
+    if (error) {
+      toast.error('Failed to create notice');
+      console.error(error);
+      return;
+    }
+
+    toast.success('Notice created!');
+    setUserNotices([...(data as Notice[]), ...userNotices]);
+
+    // Reset form
     setTitle('');
     setContent('');
     setDepartment('');
     setOffice('');
     setExpiryDate('');
+    setActiveTab('notices');
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
             {user.role === 'admin' ? 'Admin Dashboard' : 'Staff Dashboard'}
           </h1>
-          <p className="text-muted-foreground">
-            Manage notices and view statistics
-          </p>
+          <p className="text-muted-foreground">Manage notices and view statistics</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="notices">My Notices</TabsTrigger>
             <TabsTrigger value="create">Create Notice</TabsTrigger>
-            {user.role === 'admin' && (
-              <TabsTrigger value="users">Manage Users</TabsTrigger>
-            )}
+            {user.role === 'admin' && <TabsTrigger value="users">Manage Users</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="notices">
@@ -75,7 +169,7 @@ const Dashboard = () => {
                       size="icon"
                       variant="secondary"
                       className="h-8 w-8"
-                      onClick={() => toast.info('Edit functionality requires backend')}
+                      onClick={() => toast.info('Edit requires backend')}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -83,7 +177,7 @@ const Dashboard = () => {
                       size="icon"
                       variant="destructive"
                       className="h-8 w-8"
-                      onClick={() => toast.info('Delete functionality requires backend')}
+                      onClick={() => toast.info('Delete requires backend')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -109,9 +203,7 @@ const Dashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Create New Notice</CardTitle>
-                <CardDescription>
-                  Post a new notice to the university notice board
-                </CardDescription>
+                <CardDescription>Post a new notice to the university notice board</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleCreateNotice} className="space-y-4">
@@ -146,11 +238,13 @@ const Dashboard = () => {
                           <SelectValue placeholder="Select department" />
                         </SelectTrigger>
                         <SelectContent>
-                          {departments.filter(d => d !== 'All Departments').map((dept) => (
-                            <SelectItem key={dept} value={dept}>
-                              {dept}
-                            </SelectItem>
-                          ))}
+                          {departments
+                            .filter((d) => d !== 'All Departments')
+                            .map((dept) => (
+                              <SelectItem key={dept} value={dept}>
+                                {dept}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -162,11 +256,13 @@ const Dashboard = () => {
                           <SelectValue placeholder="Select office" />
                         </SelectTrigger>
                         <SelectContent>
-                          {offices.filter(o => o !== 'All Offices').map((off) => (
-                            <SelectItem key={off} value={off}>
-                              {off}
-                            </SelectItem>
-                          ))}
+                          {offices
+                            .filter((o) => o !== 'All Offices')
+                            .map((off) => (
+                              <SelectItem key={off} value={off}>
+                                {off}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -189,10 +285,6 @@ const Dashboard = () => {
                       Create Notice
                     </Button>
                   </div>
-
-                  <p className="text-xs text-center text-muted-foreground">
-                    Persistence and file attachments require backend (enable Lovable Cloud)
-                  </p>
                 </form>
               </CardContent>
             </Card>
@@ -203,9 +295,7 @@ const Dashboard = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>User Management</CardTitle>
-                  <CardDescription>
-                    Manage user accounts and permissions
-                  </CardDescription>
+                  <CardDescription>Manage user accounts and permissions</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-12">
@@ -213,9 +303,7 @@ const Dashboard = () => {
                     <p className="text-muted-foreground mb-4">
                       User management requires backend functionality
                     </p>
-                    <Button variant="outline">
-                      Enable Lovable Cloud
-                    </Button>
+                    <Button variant="outline">Enable backend</Button>
                   </div>
                 </CardContent>
               </Card>

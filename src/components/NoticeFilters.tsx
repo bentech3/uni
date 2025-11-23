@@ -1,7 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search } from 'lucide-react';
-import { departments, offices } from '@/lib/mockData';
 
 interface NoticeFiltersProps {
   search: string;
@@ -10,6 +9,8 @@ interface NoticeFiltersProps {
   setSelectedDepartment: (value: string) => void;
   selectedOffice: string;
   setSelectedOffice: (value: string) => void;
+  departments: string[];
+  offices: string[];
 }
 
 export const NoticeFilters = ({
@@ -19,6 +20,8 @@ export const NoticeFilters = ({
   setSelectedDepartment,
   selectedOffice,
   setSelectedOffice,
+  departments,
+  offices,
 }: NoticeFiltersProps) => {
   return (
     <div className="space-y-4">
@@ -39,9 +42,7 @@ export const NoticeFilters = ({
           </SelectTrigger>
           <SelectContent>
             {departments.map((dept) => (
-              <SelectItem key={dept} value={dept}>
-                {dept}
-              </SelectItem>
+              <SelectItem key={dept} value={dept}>{dept}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -52,9 +53,7 @@ export const NoticeFilters = ({
           </SelectTrigger>
           <SelectContent>
             {offices.map((office) => (
-              <SelectItem key={office} value={office}>
-                {office}
-              </SelectItem>
+              <SelectItem key={office} value={office}>{office}</SelectItem>
             ))}
           </SelectContent>
         </Select>

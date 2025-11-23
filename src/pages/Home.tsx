@@ -1,20 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Header } from '@/components/Header';
-import { AutoScrollBoard } from '@/components/AutoScrollBoard';
 import { NoticeFilters } from '@/components/NoticeFilters';
-import { mockNotices } from '@/lib/mockData';
-import { Button } from '@/components/ui/button';
-import { Grid, List } from 'lucide-react';
 import { NoticeCard } from '@/components/NoticeCard';
+import { fetchNotices, fetchDepartments, fetchOffices } from '@/lib/data';
 
 const Home = () => {
+  const [notices, setNotices] = useState([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [offices, setOffices] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
   const [selectedOffice, setSelectedOffice] = useState('All Offices');
-  const [viewMode, setViewMode] = useState<'scroll' | 'grid'>('scroll');
+
+  useEffect(() => {
+    fetchNotices().then(setNotices);
+    fetchDepartments().then((d) => setDepartments(['All Departments', ...d]));
+    fetchOffices().then((o) => setOffices(['All Offices', ...o]));
+  }, []);
 
   const filteredNotices = useMemo(() => {
-    return mockNotices.filter((notice) => {
+    return notices.filter((notice: any) => {
       const matchesSearch =
         search === '' ||
         notice.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -22,77 +27,40 @@ const Home = () => {
 
       const matchesDepartment =
         selectedDepartment === 'All Departments' ||
-        notice.department === selectedDepartment ||
-        notice.department === 'All Departments';
+        notice.department_id === selectedDepartment;
 
       const matchesOffice =
-        selectedOffice === 'All Offices' || notice.office === selectedOffice;
+        selectedOffice === 'All Offices' ||
+        notice.office_id === selectedOffice;
 
-      return matchesSearch && matchesDepartment && matchesOffice && notice.isActive;
+      return matchesSearch && matchesDepartment && matchesOffice && notice.is_active;
     });
-  }, [search, selectedDepartment, selectedOffice]);
+  }, [search, selectedDepartment, selectedOffice, notices]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background">
+    <div className="min-h-screen bg-background">
       <Header />
-      
+
       <main className="container py-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-gradient mb-2">
-            UCU Digital Notice Board
-          </h1>
-          <p className="text-muted-foreground">
-            Stay updated with the latest announcements and notices from Uganda Christian University
-          </p>
+        <NoticeFilters
+          search={search}
+          setSearch={setSearch}
+          selectedDepartment={selectedDepartment}
+          setSelectedDepartment={setSelectedDepartment}
+          selectedOffice={selectedOffice}
+          setSelectedOffice={setSelectedOffice}
+          departments={departments}
+          offices={offices}
+        />
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredNotices.map((notice: any) => (
+            <NoticeCard key={notice.id} notice={notice} />
+          ))}
+          {filteredNotices.length === 0 && (
+            <p className="text-center col-span-full text-muted-foreground">No notices found</p>
+          )}
         </div>
-
-        <div className="mb-6 flex items-center justify-between">
-          <NoticeFilters
-            search={search}
-            setSearch={setSearch}
-            selectedDepartment={selectedDepartment}
-            setSelectedDepartment={setSelectedDepartment}
-            selectedOffice={selectedOffice}
-            setSelectedOffice={setSelectedOffice}
-          />
-        </div>
-
-        <div className="mb-4 flex justify-end">
-          <div className="flex gap-2">
-            <Button
-              variant={viewMode === 'scroll' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('scroll')}
-            >
-              <List className="h-4 w-4 mr-2" />
-              Auto-Scroll
-            </Button>
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-            >
-              <Grid className="h-4 w-4 mr-2" />
-              Grid View
-            </Button>
-          </div>
-        </div>
-
-        {viewMode === 'scroll' ? (
-          <AutoScrollBoard notices={filteredNotices} />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredNotices.map((notice) => (
-              <NoticeCard key={notice.id} notice={notice} />
-            ))}
-          </div>
-        )}
-
-        {filteredNotices.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No notices found matching your criteria.</p>
-          </div>
-        )}
       </main>
     </div>
   );
